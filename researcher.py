@@ -56,21 +56,11 @@ def research_sub_question(
         )
     except Exception as exc:
         print(f"Search failed: {exc}")
-        unique_findings = []
-        seen_claims = set()
-
-        for finding in findings:
-            normalized_claim = " ".join(finding.claim.lower().split())
-
-            if normalized_claim not in seen_claims:
-                seen_claims.add(normalized_claim)
-                unique_findings.append(finding)
 
         return ResearchResult(
             sub_question=sub_question,
-            status="success" if unique_findings else "insufficient_evidence",
-            findings=unique_findings,
-            message=None if unique_findings else "No supported findings were extracted.",
+            status="search_failed",
+            message="The web search could not be completed.",
         )
 
     results = search_response.get("results", [])
@@ -227,42 +217,6 @@ def research_sub_question(
                 print(f"  {reason}: {count}")
 
 
-        # Map each retrieved URL to its original source content.
-        source_content_by_url = {
-            item.get("url"): item.get("content", "")
-            for item in results
-            if item.get("url")
-        }
-
-        def normalize_text(text: str) -> str:
-            """Normalize whitespace and case for text comparison."""
-            return " ".join(text.casefold().split())
-
-        findings = []
-
-        for item in raw_findings:
-            source_url = item.get("source_url")
-            snippet = item.get("snippet", "")
-
-            # Reject findings whose URL was not retrieved.
-            if source_url not in source_content_by_url:
-                continue
- 
-            # Reject missing snippets or snippets not found in source content.
-            source_content = source_content_by_url[source_url]
-
-            if not snippet.strip():
-                continue
-
-            if normalize_text(snippet) not in normalize_text(source_content):
-                print(f"Rejected finding: snippet not found in source: {source_url}")
-                continue
-
-            item["retrieved_at"] = timestamp
-
-            finding = Finding.model_validate(item)
-            findings.append(finding)
-
         return ResearchResult(
             sub_question=sub_question,
             status="success" if findings else "insufficient_evidence",
@@ -272,13 +226,12 @@ def research_sub_question(
 
     
     except Exception as exc:
-        print(f"Search failed: {exc}")
+        print(f"Research processing failed: {exc}")
         return ResearchResult(
             sub_question=sub_question,
-            status="search_failed",
-            message="The web search could not be completed.",
+            status="research_failed",
+            message="The research process could not be completed.",
         )
-
 
 
 if __name__ == "__main__":
