@@ -49,9 +49,11 @@ def research_sub_question(
     sub_question: str,
 ) -> ResearchResult:
     try:
+        search_query = sub_question.strip().rstrip("?")
+
         search_response = search_client.search(
-            query=sub_question,
-            search_depth="basic",
+            query=search_query,
+            search_depth="advanced",
             max_results=5,
         )
     except Exception as exc:
@@ -215,6 +217,29 @@ def research_sub_question(
         for reason, count in rejection_reasons.items():
             if count:
                 print(f"  {reason}: {count}")
+
+        
+        unique_findings = []
+        seen_claims = set()
+
+        for finding in findings:
+            normalized_claim = " ".join(
+                finding.claim.casefold().split()
+            )
+
+            if normalized_claim not in seen_claims:
+                seen_claims.add(normalized_claim)
+                unique_findings.append(finding)
+
+        duplicates_removed = len(findings) - len(unique_findings)
+
+        print("\nDeduplication summary:")
+        print(f"Findings before deduplication: {len(findings)}")
+        print(f"Duplicates removed: {duplicates_removed}")
+        print(f"Unique findings retained: {len(unique_findings)}")
+
+        findings = unique_findings
+
 
 
         return ResearchResult(
