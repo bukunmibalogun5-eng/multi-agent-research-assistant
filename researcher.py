@@ -55,6 +55,7 @@ def research_sub_question(
             query=search_query,
             search_depth="advanced",
             max_results=5,
+            include_raw_content=True,
         )
     except Exception as exc:
         print(f"Search failed: {exc}")
@@ -68,10 +69,16 @@ def research_sub_question(
     results = search_response.get("results", [])
 
     print("\nTavily search results:")
+
     for item in results:
+        content = item.get("content", "")
+        raw_content = item.get("raw_content")
+
         print(f"\nTitle: {item.get('title')}")
         print(f"URL: {item.get('url')}")
-        print(f"Content: {item.get('content', '')[:500]}")
+        print(f"Search content length: {len(content)}")
+        print(f"Raw content available: {bool(raw_content)}")
+        print(f"Raw content length: {len(raw_content or '')}")
 
     if not results:
         return ResearchResult(
@@ -82,10 +89,12 @@ def research_sub_question(
 
     timestamp = datetime.now(timezone.utc).isoformat()
 
+    MAX_CHARS_PER_SOURCE = 6000
+
     source_text = "\n\n".join(
         f"Source URL: {item.get('url', '')}\n"
         f"Title: {item.get('title', '')}\n"
-        f"Content: {item.get('content', '')}"
+        f"Content: {(item.get('raw_content') or item.get('content', ''))[:MAX_CHARS_PER_SOURCE]}"
         for item in results
     )
 
@@ -100,9 +109,13 @@ def research_sub_question(
                         
                         "Extract useful findings from the supplied source material that help "
                         "answer the research question. "
-                        "Return a JSON object with a 'findings' array. "
-                        "Each finding must contain exactly four fields: "
-                        "'claim', 'source_url', 'snippet', and 'retrieved_at'. "
+                        "Return valid JSON only, with no Markdown or extra text. "
+                        "The top-level object must contain a 'findings' array. "
+                        "Each array item must be an object containing exactly these four "
+                        "string fields: 'claim', 'source_url', 'snippet', and 'retrieved_at'. "
+                        "Return no more than 4 findings in total. "
+                        "Choose the most relevant findings and keep each claim concise. "
+                        "Use an empty array if no useful findings are supported. "
                         "The claim must accurately reflect what the source says. "
                         "The snippet must be copied exactly from the supplied source content; "
                         "do not paraphrase it. "
@@ -127,8 +140,11 @@ def research_sub_question(
                 },
             ],
             response_format={"type": "json_object"},
-            max_completion_tokens=3000,
+            max_completion_tokens=4000,
         )
+
+        print("Finish reason:", response.choices[0].finish_reason)
+        print("Completion tokens:", response.usage.completion_tokens)
         choice = response.choices[0]
 
         if choice.finish_reason == "length":
@@ -148,7 +164,9 @@ def research_sub_question(
 
         # Map each retrieved URL to its original source content.
         source_content_by_url = {
-            item.get("url"): item.get("content", "")
+            item.get("url"): (
+                item.get("raw_content") or item.get("content", "")
+            )[:MAX_CHARS_PER_SOURCE]
             for item in results
             if item.get("url")
         }
@@ -185,6 +203,13 @@ def research_sub_question(
             if not isinstance(snippet, str) or not snippet.strip():
                 rejection_reasons["missing_snippet"] += 1
                 print(f"REJECTED: Missing snippet: {source_url}")
+                continue
+
+            if len(snippet.strip()) < 40:
+                rejection_reasons["snippet_too_short"] = (
+                    rejection_reasons.get("snippet_too_short", 0) + 1
+                )
+                print(f"REJECTED: Snippet too short: {source_url}")
                 continue
 
             source_content = source_content_by_url[source_url]
