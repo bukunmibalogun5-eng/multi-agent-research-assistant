@@ -1,0 +1,89 @@
+[
+  {
+    "sub_question": "Does the use of AI-assisted diagnostic tools reduce the workload of radiologists and clinicians in Nigerian healthcare facilities?",
+    "status": "success",
+    "findings": [
+      {
+        "claim": "AI has been identified as a potential solution to positively impact the workload of radiology services",
+        "source_url": "https://www.medrxiv.org/content/10.1101/2025.07.24.25332132v1.full-text",
+        "snippet": "Artificial intelligence (AI) has been identified, notably by AI developers, as a potential solution to impact positively the workload of radiology services for diagnostics to address this staffing shortfall.",
+        "retrieved_at": "2026-10-30T15:27:11.048577+00:00"
+      },
+      {
+        "claim": "AI can reduce diagnostic time by approximately 90% or more in radiology",
+        "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11813001",
+        "snippet": "AI improved accuracy and reduced diagnostic time by approximately 90% or more.",
+        "retrieved_at": "2026-10-30T15:27:11.048577+00:00"
+      }
+    ],
+    "message": null
+  },
+  {
+    "sub_question": "To what extent do AI-driven triage systems improve patient flow and reduce the need for additional clinical staff in Nigeria?",
+    "status": "research_failed",
+    "findings": [],
+    "message": "The research process could not be completed."
+  },
+  {
+    "sub_question": "Is AI employed in remote monitoring or telehealth platforms to compensate for shortages of physicians and nurses in Nigerian settings?",
+    "status": "success",
+    "findings": [
+      {
+        "claim": "AI-driven telemedicine solutions can bridge Nigeria’s rural healthcare gap by enabling patients to receive consultations from urban doctors or even abroad, thereby compensating for physician shortages.",
+        "source_url": "https://www.linkedin.com/pulse/can-ai-address-issue-healthcare-staffing-shortage-nigeria-qsuzf",
+        "snippet": "AI-driven telemedicine solutions can bridge this gap, allowing patients to receive consultations from doctors located in urban centers or even abroad.",
+        "retrieved_at": "2026-10-30T15:27:54.130029+00:00"
+      },
+      {
+        "claim": "Training Nigerian doctors and nurses in AI equips them to use AI tools for patient monitoring, diagnostics, and medical record systems in hospitals and clinics, strengthening healthcare delivery.",
+        "source_url": "https://www.globalgiving.org/projects/ai-for-health-train-500-nigerian-doctors-and-nurses",
+        "snippet": "Training doctors and nurses in AI skills will strengthen healthcare delivery in Nigeria.Participants will return to their hospitals and clinics equipped to use AI tools for diagnostics, patient monitoring, & medical record systems.",
+        "retrieved_at": "2026-10-30T15:27:54.130029+00:00"
+      },
+      {
+        "claim": "AI can speed and improve diagnoses in Nigeria and make care more accessible through telemedicine and AI-powered apps.",
+        "source_url": "https://www.facebook.com/ossai.stephen.5/posts/more-healthtech-startups-needed-in-nigeria-tackling-expert-scarcity-with-ai-and-/3374246879404737",
+        "snippet": "AI can speed and improve diagnoses in Nigeria and make care more accessible through telemedicine and AI-powered apps.",
+        "retrieved_at": "2026-10-30T15:27:54.130029+00:00"
+      }
+    ],
+    "message": null
+  },
+  {
+    "sub_question": "Does the implementation of AI in administrative and billing tasks reduce the time healthcare professionals spend on non-clinical duties in Nigerian hospitals?",
+    "status": "research_failed",
+    "findings": [],
+    "message": "The research process could not be completed."
+  },
+  {
+    "sub_question": "What evidence exists that AI tools contribute to improved patient outcomes or workforce retention in Nigerian healthcare contexts?",
+    "status": "success",
+    "findings": [
+      {
+        "claim": "AI tools are perceived to facilitate efficient service delivery in Nigerian healthcare, potentially benefiting workforce retention.",
+        "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10834749",
+        "snippet": "Three-quarters (77%) of the respondents agreed that the use of machine learning in Nigerian healthcare could facilitate efficient service delivery.",
+        "retrieved_at": "2026-10-30T15:28:07.005105+00:00"
+      },
+      {
+        "claim": "AI is recognized in Nigeria as an opportunity to enhance service delivery, optimize workforce management, and improve health information systems.",
+        "source_url": "https://insighthealth.group/harnessing-artificial-intelligence-to-address-challenges-in-nigerias-health-system",
+        "snippet": "AI presents opportunities to enhance service delivery, optimize workforce management, and improve health information systems.",
+        "retrieved_at": "2026-10-30T15:28:07.005105+00:00"
+      },
+      {
+        "claim": "A rapid review found that over 65% of studies on AI in Nigeria recommend or encourage its use, indicating growing domestic evidence of AI's potential benefits.",
+        "source_url": "https://jmai.amegroups.org/article/view/11267/html",
+        "snippet": "65% of available literature supports or encourages AI use for health in Nigeria.",
+        "retrieved_at": "2026-10-30T15:28:07.005105+00:00"
+      },
+      {
+        "claim": "AI applications in Nigeria include cardiology, disease prediction, prevention, and diagnosis, indicating potential impact on patient outcomes.",
+        "source_url": "https://jmai.amegroups.org/article/view/11267/html",
+        "snippet": "Areas of application included cardiology, disease prediction, prevention, and diagnosis.",
+        "retrieved_at": "2026-10-30T15:28:07.005105+00:00"
+      }
+    ],
+    "message": null
+  }
+]
