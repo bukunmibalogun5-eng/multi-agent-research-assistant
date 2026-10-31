@@ -1,4 +1,5 @@
 
+from typing import Literal
 import os
 import json
 import time
@@ -30,6 +31,8 @@ search_client = TavilyClient(api_key=tavily_api_key)
 
 
 # Data models
+
+
 class Finding(BaseModel):
     claim: str = Field(
         description="A factual claim supported by the source."
@@ -43,6 +46,17 @@ class Finding(BaseModel):
     retrieved_at: str = Field(
         description="UTC timestamp when the source was retrieved."
     )
+    evidence_type: Literal[
+        "measured_outcome",
+        "observed_finding",
+        "perception",
+        "proposal",
+        "prediction",
+        "background_context",
+    ] = Field(
+        description="The type of evidence supporting the finding."
+    )
+
 
 
 class ResearchResult(BaseModel):
@@ -151,8 +165,36 @@ def research_sub_question(
                                 "Return valid JSON only, with no Markdown or extra text. "
                                 "The top-level object must contain a 'findings' array. "
 
-                                "Each array item must be an object containing exactly these four "
-                                "string fields: 'claim', 'source_url', 'snippet', and 'retrieved_at'. "
+                                "Each array item must contain exactly these five fields: "
+                                "'claim', 'source_url', 'snippet', 'retrieved_at', and 'evidence_type'. "
+
+                                "The evidence_type must be exactly one of these values: "
+                                "'measured_outcome', 'observed_finding', 'perception', "
+                                "'proposal', 'prediction', or 'background_context'. "
+
+                                "Classify evidence based on what the source actually establishes, "
+                                "not what the claim might imply. "
+
+                                "Use 'measured_outcome' when the source reports an outcome "
+                                "supported by measured or quantitative evaluation. "
+
+                                "Use 'observed_finding' when the source reports a finding "
+                                "directly observed through research or investigation. "
+
+                                "Use 'perception' when the evidence represents opinions, "
+                                "experiences, or beliefs reported by participants. "
+
+                                "Use 'proposal' when the source recommends or suggests "
+                                "a possible intervention or solution. "
+
+                                "Use 'prediction' when the source describes an expected "
+                                "or forecast outcome that has not yet been established. "
+
+                                "Use 'background_context' for general contextual information "
+                                "that does not fit the other categories. "
+
+                                "Do not classify a proposed or potential benefit as a "
+                                "measured outcome. "
 
                                 "Return no more than 4 findings in total. "
                                 "Choose the most relevant findings and keep each claim concise. "
