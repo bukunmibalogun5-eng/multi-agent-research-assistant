@@ -56,7 +56,18 @@ class Finding(BaseModel):
     ] = Field(
         description="The type of evidence supporting the finding."
     )
-
+    alignment_status: Literal[
+        "supported",
+        "partially_supported",
+        "unsupported",
+    ] = Field(
+        default="supported",
+        description="How well the source excerpt supports the extracted claim."
+    )
+    alignment_reason: str = Field(
+        default="",
+        description="Explanation of the claim-to-evidence alignment assessment."
+    )
 
 
 class ResearchResult(BaseModel):
@@ -65,6 +76,163 @@ class ResearchResult(BaseModel):
     findings: list[Finding] = Field(default_factory=list)
     message: str | None = None
 
+def assess_claim_alignment(candidates: list[dict]) -> list[dict]:
+    """
+    Assess whether each extracted claim is supported by its source excerpt.
+    Uses one batch LLM call for all candidates.
+    """
+
+    if not candidates:
+        return []
+
+    assessment_input = [
+        {
+            "finding_id": index,
+            "claim": item["claim"],
+            "snippet": item["snippet"],
+        }
+        for index, item in enumerate(candidates)
+    ]
+
+    prompt = f"""
+            You are an evidence verification assistant.
+
+            Your task is to evaluate whether each factual claim is supported by
+            the source excerpt provided alongside it.
+
+            Assess each claim independently.
+
+            Use these classifications:
+
+            1. supported:
+                The excerpt directly supports the claim without requiring a
+                significant unsupported assumption.
+
+            2. partially_supported:
+                The excerpt supports only part of the claim, or the claim contains
+                an interpretation or detail that goes beyond what the excerpt establishes.
+
+            3. unsupported:
+                The excerpt does not provide sufficient evidence for the claim,
+                contradicts it, or discusses a different subject.
+
+            Important rules:
+            - Do not use outside knowledge.
+            - Do not assume information that is not present in the excerpt.
+            - Distinguish direct evidence from reasonable but unverified interpretation.
+            - A claim must not be classified as supported merely because it sounds plausible.
+            - Be especially careful with claims about causation, outcomes, effectiveness,
+            quantities, comparisons, and generalisations.
+            - Keep explanations brief and specific.
+
+            Return valid JSON only, using this exact structure:
+
+{{
+    "assessments": [
+        {{
+            "finding_id": 0,
+            "alignment_status": "supported",
+            "alignment_reason": "The excerpt directly supports the claim."
+        }}
+    ]
+}}
+
+Assess every finding_id provided. Do not omit any.
+
+Findings to assess:
+{json.dumps(assessment_input, ensure_ascii=False, indent=2)}
+"""
+
+    response = None
+
+    for attempt in range(3):
+        try:
+            response = llm.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                temperature=0,
+            )
+            break
+
+        except Exception as exc:
+            status_code = getattr(exc, "status_code", None)
+
+            if status_code not in {429, 500, 502, 503, 504}:
+                raise
+
+            if attempt == 2:
+                raise
+
+            wait_time = 10 * (attempt + 1)
+
+            print(
+                f"Claim alignment request failed (HTTP {status_code}). "
+                f"Retrying in {wait_time} seconds..."
+            )
+
+            time.sleep(wait_time)
+
+    if response is None:
+        raise RuntimeError("Claim alignment request failed after retries.")
+
+    content = response.choices[0].message.content
+
+    if not content:
+        raise ValueError("Claim alignment assessment returned an empty response.")
+
+    try:
+        parsed_response = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Claim alignment assessment returned invalid JSON."
+        ) from exc
+
+    assessments = parsed_response.get("assessments")
+
+    if not isinstance(assessments, list):
+        raise ValueError("Invalid claim alignment assessment structure.")
+
+    validated_assessments = {}
+
+    for assessment in assessments:
+        if not isinstance(assessment, dict):
+            continue
+
+        finding_id = assessment.get("finding_id")
+        status = assessment.get("alignment_status")
+        reason = assessment.get("alignment_reason")
+
+        if (
+            isinstance(finding_id, int)
+            and finding_id in range(len(candidates))
+            and status in {
+                "supported",
+                "partially_supported",
+                "unsupported",
+            }
+            and isinstance(reason, str)
+            and reason.strip()
+        ):
+            validated_assessments[finding_id] = {
+                "alignment_status": status,
+                "alignment_reason": reason.strip(),
+            }
+
+    if len(validated_assessments) != len(candidates):
+        raise ValueError(
+            "Claim alignment assessment did not return a valid assessment "
+            "for every finding."
+        )
+
+    return [
+        validated_assessments[index]
+        for index in range(len(candidates))
+    ]
 
 def research_sub_question(
     sub_question: str,
@@ -304,6 +472,7 @@ def research_sub_question(
             return " ".join(text.casefold().split())
 
         findings = []
+        validated_candidates = []
 
         rejection_reasons = {
             "invalid_format": 0,
@@ -311,9 +480,13 @@ def research_sub_question(
             "missing_snippet": 0,
             "snippet_mismatch": 0,
             "invalid_schema": 0,
+            "unsupported_alignment": 0,
         }
 
         print("\nFinding validation:")
+
+        # First: verify that each finding references a retrieved source
+        # and that its supporting snippet exists in that source.
 
         for item in raw_findings:
 
@@ -352,25 +525,56 @@ def research_sub_question(
                 )
                 continue
 
-            # Use our own retrieval timestamp
-            item["retrieved_at"] = timestamp
+            validated_candidates.append(item.copy())
 
-            try:
-                finding = Finding.model_validate(item)
+        # Second: assess whether each claim is actually supported
+        # by its accompanying source excerpt.
 
-            except Exception as exc:
-                rejection_reasons["invalid_schema"] += 1
-                print(f"REJECTED: Invalid finding structure: {exc}")
-                continue
+        if validated_candidates:
+            print("\nAssessing claim-to-evidence alignment...")
 
-            findings.append(finding)
-            print(f"ACCEPTED: {finding.claim}")
+            alignment_results = assess_claim_alignment(
+                validated_candidates
+            )
+
+            for item, alignment in zip(
+                validated_candidates,
+                alignment_results,
+            ):
+                item["retrieved_at"] = timestamp
+                item["alignment_status"] = alignment["alignment_status"]
+                item["alignment_reason"] = alignment["alignment_reason"]
+
+                if item["alignment_status"] == "unsupported":
+                    rejection_reasons["unsupported_alignment"] += 1
+                    print(
+                        f"REJECTED: {item['claim']}\n"
+                        f"Reason: {item['alignment_reason']}"
+                    )
+                    continue
+
+                try:
+                    finding = Finding.model_validate(item)
+
+                except Exception as exc:
+                    rejection_reasons["invalid_schema"] += 1
+                    print(f"REJECTED: Invalid finding structure: {exc}")
+                    continue
+
+                findings.append(finding)
+
+                print(
+                    f"ACCEPTED ({finding.alignment_status}): "
+                    f"{finding.claim}"
+                )
+                print(f"Alignment reason: {finding.alignment_reason}")
 
         accepted_count = len(findings)
         rejected_count = sum(rejection_reasons.values())
 
         print("\nValidation summary:")
         print(f"Extracted: {len(raw_findings)}")
+        print(f"Source-validated: {len(validated_candidates)}")
         print(f"Accepted: {accepted_count}")
         print(f"Rejected: {rejected_count}")
 

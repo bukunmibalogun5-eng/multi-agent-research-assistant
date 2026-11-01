@@ -176,8 +176,31 @@ def generate_report(
                     "evidence_type": finding.get(
                         "evidence_type", "unspecified"
                     ),
+                    "alignment_status": finding.get(
+                        "alignment_status", "not_assessed"
+                    ),
+                    "alignment_reason": finding.get(
+                        "alignment_reason",
+                        "Claim-to-evidence alignment was not assessed.",
+                    ),
                 }
             )
+
+    # Exclude unsupported claims and count findings not assessed.
+    unsupported_count = sum(
+        1 for finding in findings
+        if finding["alignment_status"] == "unsupported"
+    )
+
+    findings = [
+        finding for finding in findings
+        if finding["alignment_status"] != "unsupported"
+    ]
+
+    not_assessed_count = sum(
+        1 for finding in findings
+        if finding["alignment_status"] == "not_assessed"
+    )        
 
     if not findings:
         return (
@@ -250,6 +273,8 @@ def generate_report(
             f"Claim: {finding['claim']}\n"
             f"Supporting excerpt: {finding['snippet']}\n"
             f"Citation: [{citation}] {url}"
+            f"Claim-to-evidence alignment: {finding['alignment_status']}\n"
+            f"Alignment explanation: {finding['alignment_reason']}\n"
         )
 
     evidence_text = "\n\n---\n\n".join(evidence)
@@ -339,6 +364,23 @@ def generate_report(
                     "If evidence is insufficient, state this clearly. "
                     "Return Markdown only."
 
+                    "CLAIM-TO-EVIDENCE ALIGNMENT:\n"
+                    "- supported: The source excerpt directly supports the claim.\n"
+                    "- partially_supported: The excerpt supports only part of the claim "
+                    "or the claim includes an inference beyond what it establishes.\n"
+                    "- not_assessed: No claim-to-evidence alignment assessment is available.\n\n"
+
+                    "Interpret these classifications strictly:\n"
+                    "1. Treat supported claims as evidence, while still considering "
+                    "their evidence type and limitations.\n"
+                    "2. Clearly qualify partially supported claims. Explain which part "
+                    "is supported and which part remains an inference.\n"
+                    "3. Never present a partially supported claim as an established fact.\n"
+                    "4. Treat not_assessed claims cautiously and do not describe them "
+                    "as independently verified.\n"
+                    "5. Do not upgrade a finding's alignment classification yourself.\n"
+                    "6. Unsupported claims should not appear in the report.\n\n"
+
                     " SOURCE TYPE AND PROVENANCE:\n"
                     "Each finding includes a source publication-type classification. "
                     "Use this information to describe the provenance of the evidence.\n\n"
@@ -355,6 +397,27 @@ def generate_report(
                     "When discussing limitations, identify reliance on preprints, "
                     "opinion content, organizational publications, or unknown sources "
                     "where relevant.\n\n"
+                    "CRITICAL EVIDENCE INTERPRETATION RULES:\n\n"
+
+                    "1. Distinguish between what the evidence directly establishes "
+                    "and what can only reasonably be inferred from it.\n\n"
+
+                    "2. Do not confuse intermediate findings, indicators, or "
+                    "correlations with the ultimate outcome being investigated.\n\n"
+
+                    "3. Do not infer causation from correlation or association.\n\n"
+
+                    "4. Do not present proposed, expected, or potential benefits "
+                    "as demonstrated results.\n\n"
+
+                    "5. Ensure that every interpretation and conclusion is "
+                    "proportionate to the strength and scope of the supporting evidence.\n\n"
+
+                    "6. Where evidence supports only a partial answer, explain "
+                    "what it establishes and identify what remains uncertain.\n\n"
+
+                    "7. Do not generalize findings beyond the populations, "
+                    "settings, conditions, or timeframes supported by the evidence.\n\n"
                 ),
             },
             {
@@ -365,6 +428,8 @@ def generate_report(
                     f"References:\n{references}\n\n"
                     f"Number of findings excluded as irrelevant: "
                     f"{excluded_count}"
+                    f"Number of unsupported claims excluded: {unsupported_count}\n"
+                    f"Number of findings without alignment assessment: {not_assessed_count}"
                 ),
             },
         ],
