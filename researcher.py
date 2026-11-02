@@ -60,8 +60,9 @@ class Finding(BaseModel):
         "supported",
         "partially_supported",
         "unsupported",
+        "not_assessed",
     ] = Field(
-        default="supported",
+        default="not_assessed",
         description="How well the source excerpt supports the extracted claim."
     )
     alignment_reason: str = Field(
@@ -127,6 +128,7 @@ def assess_claim_alignment(candidates: list[dict]) -> list[dict]:
 
             Return valid JSON only, using this exact structure:
 
+           
 {{
     "assessments": [
         {{
@@ -234,6 +236,27 @@ Findings to assess:
         for index in range(len(candidates))
     ]
 
+def assess_alignment_with_fallback(
+    candidates: list[dict],
+) -> list[dict]:
+    try:
+        return assess_claim_alignment(candidates)
+
+    except Exception as exc:
+        print(f"Claim alignment assessment failed: {exc}")
+        print("Retaining source-validated findings as not_assessed.")
+
+        return [
+            {
+                "alignment_status": "not_assessed",
+                "alignment_reason": (
+                    "Claim-to-evidence alignment could not be completed "
+                    "because the assessment process failed."
+                ),
+            }
+            for _ in candidates
+        ]
+
 def research_sub_question(
     sub_question: str,
 ) -> ResearchResult:
@@ -307,7 +330,7 @@ def research_sub_question(
     # STEP 2: Prepare source material
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    MAX_CHARS_PER_SOURCE = 3000
+    MAX_CHARS_PER_SOURCE = 2000
 
     source_text = "\n\n".join(
         f"Source URL: {item.get('url', '')}\n"
@@ -403,7 +426,7 @@ def research_sub_question(
                         },
                     ],
                     response_format={"type": "json_object"},
-                    max_completion_tokens=4000,
+                    max_completion_tokens=2000,
                 )
 
                 # Stop retrying when the request succeeds
@@ -412,7 +435,6 @@ def research_sub_question(
             except Exception as exc:
                 status_code = getattr(exc, "status_code", None)
 
-                # Retry only temporary rate-limit and server errors
                 retryable = (
                     status_code == 429
                     or (
@@ -421,16 +443,31 @@ def research_sub_question(
                     )
                 )
 
-                # Re-raise if the error is not retryable
-                # or all three attempts have been used
                 if not retryable or attempt == 2:
                     raise
 
-                wait_time = 10 * (attempt + 1)
+                # Read retry information from Groq's response headers
+                response_obj = getattr(exc, "response", None)
+                headers = (
+                    response_obj.headers
+                    if response_obj is not None
+                    else {}
+                )
+
+                retry_after = headers.get("retry-after")
+
+                try:
+                    if retry_after is not None:
+                        wait_time = float(retry_after) + 1
+                    else:
+                        wait_time = 10 * (attempt + 1)
+
+                except (ValueError, TypeError):
+                    wait_time = 10 * (attempt + 1)
 
                 print(
                     f"Groq request failed (HTTP {status_code}). "
-                    f"Retrying in {wait_time} seconds... "
+                    f"Retrying in {wait_time:.1f} seconds... "
                     f"Attempt {attempt + 2}/3"
                 )
 
@@ -533,9 +570,25 @@ def research_sub_question(
         if validated_candidates:
             print("\nAssessing claim-to-evidence alignment...")
 
-            alignment_results = assess_claim_alignment(
-                validated_candidates
-            )
+            try:
+                alignment_results = assess_alignment_with_fallback(
+                    validated_candidates
+                )
+
+            except Exception as exc:
+                print(f"Claim alignment assessment failed: {exc}")
+                print("Retaining source-validated findings as not_assessed.")
+
+                alignment_results = [
+                    {     
+                        "alignment_status": "not_assessed",
+                        "alignment_reason": (
+                            "Claim-to-evidence alignment could not be completed "
+                            "because the assessment process failed."
+                        ),
+                    }
+                    for _ in validated_candidates
+                ]
 
             for item, alignment in zip(
                 validated_candidates,
@@ -548,8 +601,8 @@ def research_sub_question(
                 if item["alignment_status"] == "unsupported":
                     rejection_reasons["unsupported_alignment"] += 1
                     print(
-                        f"REJECTED: {item['claim']}\n"
-                        f"Reason: {item['alignment_reason']}"
+                            f"REJECTED: {item['claim']}\n"
+                            f"Reason: {item['alignment_reason']}"
                     )
                     continue
 

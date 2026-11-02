@@ -1,49 +1,78 @@
 [
   {
-    "sub_question": "How do AI-powered diagnostic tools affect diagnostic accuracy and turnaround time for common diseases in Nigerian healthcare settings with limited specialist workforce?",
+    "sub_question": "To what extent are AI-powered diagnostic tools currently deployed by smallholder farmers for crop disease detection?",
+    "status": "insufficient_evidence",
+    "findings": [],
+    "message": "No supported findings were extracted."
+  },
+  {
+    "sub_question": "How does the accuracy of AI-powered diagnostic tools compare to conventional visual inspection methods in smallholder farming contexts?",
     "status": "success",
     "findings": [
       {
-        "claim": "AI is making diagnosis faster, more accurate, and more accessible than ever before.",
-        "source_url": "https://isnmedical.com/the-role-of-ai-in-medical-diagnostics",
-        "snippet": "AI is making diagnosis faster, more accurate, and more accessible than ever before.",
-        "retrieved_at": "2026-10-31T22:16:59.776006+00:00",
-        "evidence_type": "background_context",
+        "claim": "The proposed model performed with an overall accuracy of 98.32%, precision score of 97.85%, recall value of 98.14%, F1-score of 97.99%, and real-time inference speed of 42.6 ms per image.",
+        "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12868782",
+        "snippet": "The proposed model performed with an overall accuracy of 98.32%, precision score of 97.85%, recall value of 98.14%, F1-score of 97.99%, and real-time inference speed of 42.6 ms per image.",
+        "retrieved_at": "2026-11-02T13:32:03.923375+00:00",
+        "evidence_type": "measured_outcome",
         "alignment_status": "supported",
-        "alignment_reason": "The excerpt directly matches the claim verbatim."
-      },
-      {
-        "claim": "Twenty-three publications that met the inclusion criteria were reviewed. A 168% increase in AI-related publications was observed in 2025 compared to 2020, with ove.",
-        "source_url": "https://jmai.amegroups.org/article/view/11267/html",
-        "snippet": "Twenty-three publications that met the inclusion criteria were reviewed. A 168% increase in AI-related publications was observed in 2025 compared to 2020, with ove",
-        "retrieved_at": "2026-10-31T22:16:59.776006+00:00",
-        "evidence_type": "background_context",
-        "alignment_status": "supported",
-        "alignment_reason": "The excerpt contains the exact text of the claim."
+        "alignment_reason": "The excerpt directly states the same performance metrics as the claim."
       }
     ],
     "message": null
   },
   {
-    "sub_question": "What impact does AI-enabled telemedicine have on access to specialist care for patients in remote regions of Nigeria compared to conventional referral systems?",
-    "status": "research_failed",
-    "findings": [],
-    "message": "The research process could not be completed."
+    "sub_question": "What economic and resource barriers influence the adoption of AI diagnostic tools among smallholder farmers?",
+    "status": "success",
+    "findings": [
+      {
+        "claim": "Barriers such as cost, lack of awareness, and infrastructural deficits hinder widespread implementation of AI technologies among small-scale farmers.",
+        "source_url": "https://www.ijfmr.com/papers/2025/1/35717.pdf",
+        "snippet": "Key findings suggest that while AI adoption significantly enhances productivity and income, barriers such as cost, lack of awareness, and infrastructural deficits hinder widespread implementation.",
+        "retrieved_at": "2026-11-02T13:32:09.281936+00:00",
+        "evidence_type": "observed_finding",
+        "alignment_status": "partially_supported",
+        "alignment_reason": "The excerpt confirms that cost, lack of awareness, and infrastructural deficits hinder widespread implementation, but it does not specify that this applies to small-scale farmers."
+      }
+    ],
+    "message": null
   },
   {
-    "sub_question": "To what extent does AI-driven administrative automation (e.g., appointment scheduling, electronic health record management) reduce non-clinical workload for healthcare staff in Nigerian hospitals?",
-    "status": "insufficient_evidence",
-    "findings": [],
-    "message": "No supported findings were extracted."
+    "sub_question": "Which types of AI technologies (e.g., smartphone apps, UAV imagery, machine learning models) are most commonly utilized for disease detection in smallholder settings?",
+    "status": "success",
+    "findings": [
+      {
+        "claim": "UAV-based multispectral imaging combined with machine learning is employed for maize leaf disease detection in a smallholder farm in Limpopo Province, South Africa.",
+        "source_url": "https://www.nature.com/articles/s41598-026-53092-4",
+        "snippet": "This study uses unmanned aerial vehicle (UAV) remote sensing and machine learning (ML) to investigate the feasibility of detecting maize leaf diseases in a smallholder farm located in the Mopani District of Limpopo Province, South Africa.",
+        "retrieved_at": "2026-11-02T13:32:45.513965+00:00",
+        "evidence_type": "observed_finding",
+        "alignment_status": "partially_supported",
+        "alignment_reason": "The excerpt confirms UAV remote sensing and ML for maize leaf disease detection, but does not mention multispectral imaging."
+      },
+      {
+        "claim": "A smartphone-based Crop Disease Detection App is used in Ghanaian smallholder communities to identify up to 23 crop diseases from leaf photographs.",
+        "source_url": "https://www.ai4d.ai/innovations/crop-disease-detection-app",
+        "snippet": "The app uses advanced image recognition to detect up to 23 crop diseases from photos of infected leaves, delivering instant, actionable recommendations on treatment and best practices.",
+        "retrieved_at": "2026-11-02T13:32:45.513965+00:00",
+        "evidence_type": "observed_finding",
+        "alignment_status": "partially_supported",
+        "alignment_reason": "The excerpt confirms the app detects up to 23 crop diseases from leaf photos, but does not specify Ghanaian smallholder communities."
+      },
+      {
+        "claim": "By 2025, more than 60% of farmers worldwide are projected to rely on AI-powered apps for early crop disease diagnosis.",
+        "source_url": "https://farmonaut.com/precision-farming/ai-plant-disease-detection-app-free-early-diagnosis",
+        "snippet": "By 2025, over 60% of farmers globally are expected to use AI-powered apps for early crop disease diagnosis.",
+        "retrieved_at": "2026-11-02T13:32:45.513965+00:00",
+        "evidence_type": "prediction",
+        "alignment_status": "supported",
+        "alignment_reason": "The excerpt directly states that by 2025 over 60% of farmers globally will use AI-powered apps for early crop disease diagnosis."
+      }
+    ],
+    "message": null
   },
   {
-    "sub_question": "How has AI-based clinical decision support influenced clinical outcomes and workload for general practitioners in Nigerian primary care facilities?",
-    "status": "insufficient_evidence",
-    "findings": [],
-    "message": "No supported findings were extracted."
-  },
-  {
-    "sub_question": "What are the cost implications and resource savings associated with implementing AI solutions to address workforce shortages in Nigerian healthcare institutions?",
+    "sub_question": "What training or capacity-building measures are required for smallholder farmers to effectively use AI diagnostic tools?",
     "status": "insufficient_evidence",
     "findings": [],
     "message": "No supported findings were extracted."
