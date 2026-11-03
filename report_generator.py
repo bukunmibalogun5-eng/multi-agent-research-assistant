@@ -4,6 +4,7 @@ import json
 
 from dotenv import load_dotenv
 from groq import Groq
+from urllib.parse import urlparse
 
 load_dotenv()
 
@@ -14,6 +15,85 @@ if not groq_api_key:
 
 llm = Groq(api_key=groq_api_key)
 
+def validate_findings(findings: list) -> tuple[list, list]:
+    """
+    Validate finding structure and classification values.
+
+    Returns:
+        valid_findings: Findings that pass structural validation.
+        rejected_findings: Findings rejected with their validation reasons.
+    """
+
+    valid_findings = []
+    rejected_findings = []
+
+    valid_evidence_types = {
+        "measured_outcome",
+        "observed_finding",
+        "perception",
+        "proposal",
+        "prediction",
+        "background_context",
+    }
+
+    valid_alignment_statuses = {
+        "supported",
+        "partially_supported",
+        "not_assessed",
+        "unsupported",
+    }
+
+    for index, finding in enumerate(findings, start=1):
+        errors = []
+
+        if not isinstance(finding, dict):
+            rejected_findings.append({
+                "finding_index": index,
+                "reasons": ["Finding must be a dictionary."],
+            })
+            continue
+
+        # Validate required text fields.
+        for field in ("claim", "source_url", "snippet"):
+            value = finding.get(field)
+
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"Missing or invalid {field}.")
+
+        # Validate source URL.
+        source_url = finding.get("source_url")
+
+        if isinstance(source_url, str) and source_url.strip():
+            parsed_url = urlparse(source_url.strip())
+
+            if (
+                parsed_url.scheme not in {"http", "https"}
+                or not parsed_url.netloc
+            ):
+                errors.append("Source URL must be a valid HTTP or HTTPS URL.")
+
+        # Validate evidence classification.
+        evidence_type = finding.get("evidence_type")
+
+        if evidence_type not in valid_evidence_types:
+            errors.append("Invalid or missing evidence_type.")
+
+        # Validate claim-to-evidence alignment.
+        alignment_status = finding.get("alignment_status", "not_assessed")
+
+        if alignment_status not in valid_alignment_statuses:
+            errors.append("Invalid alignment_status.")
+
+        if errors:
+            rejected_findings.append({
+                "finding_index": index,
+                "reasons": errors,
+            })
+        else:
+            # Preserve the original finding without modifying it.
+            valid_findings.append(finding)
+
+    return valid_findings, rejected_findings
 
 def assess_relevance(research_question: str, findings: list) -> list:
     """Assess how relevant each finding is to the original research question."""
@@ -155,36 +235,44 @@ def generate_report(
     """Generate a cited Markdown report from validated findings."""
 
     findings = []
+    rejected_findings = []
 
     for result in research_results:
         sub_question = result.get("sub_question", "")
+        raw_findings = result.get("findings", [])
 
-        for finding in result.get("findings", []):
-            url = finding.get("source_url")
-            claim = finding.get("claim")
-            snippet = finding.get("snippet")
+        if not isinstance(raw_findings, list):
+            rejected_findings.append({
+                "finding_index": None,
+                "reasons": ["Research result findings must be a list."],
+            })
+            continue
 
-            if not url or not claim or not snippet:
-                continue
+        # Validate findings before preparing them for the report.
+        valid_result_findings, rejected_result_findings = validate_findings(
+             raw_findings
+        )
 
-            findings.append(
-                {
-                    "sub_question": sub_question,
-                    "claim": claim,
-                    "source_url": url,
-                    "snippet": snippet,
-                    "evidence_type": finding.get(
-                        "evidence_type", "unspecified"
-                    ),
-                    "alignment_status": finding.get(
-                        "alignment_status", "not_assessed"
-                    ),
-                    "alignment_reason": finding.get(
-                        "alignment_reason",
-                        "Claim-to-evidence alignment was not assessed.",
-                    ),
-                }
-            )
+        rejected_findings.extend(rejected_result_findings)
+
+        for finding in valid_result_findings:
+            findings.append({
+                "sub_question": sub_question,
+                "claim": finding["claim"],
+                "source_url": finding["source_url"],
+                "snippet": finding["snippet"],
+                "evidence_type": finding["evidence_type"],
+                "alignment_status": finding.get(
+                    "alignment_status", "not_assessed"
+                ),
+                "alignment_reason": finding.get(
+                    "alignment_reason",
+                    "Claim-to-evidence alignment was not assessed.",
+                ),
+            })
+
+    print(f"Structurally valid findings: {len(findings)}")
+    print(f"Structurally rejected findings: {len(rejected_findings)}")
 
     # Exclude unsupported claims and count findings not assessed.
     unsupported_count = sum(
@@ -479,10 +567,13 @@ def generate_report(
                     f"Research question: {research_question}\n\n"
                     f"Relevant validated findings:\n{evidence_text}\n\n"
                     f"References:\n{references}\n\n"
+                    f"Number of findings rejected during structural validation: "
+                    f"{len(rejected_findings)}\n"
                     f"Number of findings excluded as irrelevant: "
                     f"{excluded_count}\n"
                     f"Number of unsupported claims excluded: {unsupported_count}\n"
-                    f"Number of findings without alignment assessment: {not_assessed_count}"
+                    f"Number of findings without alignment assessment: "
+                    f"{not_assessed_count}"
                 ),
             },
         ],
