@@ -109,6 +109,144 @@ class TestReportIntegration(unittest.TestCase):
             "Number of findings rejected during structural validation: 2",
             report_prompt,
         )
+    @patch("report_generator.llm")
+    @patch("report_generator.assess_relevance")
+    @patch(
+        "report_generator.assess_source_quality",
+        side_effect=RuntimeError("Simulated source assessment failure"),
+    )
+
+    def test_generate_report_continues_when_source_assessment_fails(
+        self,
+        mock_source_quality,
+        mock_relevance,
+        mock_llm,
+    ):
+        mock_relevance.return_value = [
+            {
+                "relevance": "direct",
+                "reason": "Directly addresses the research question.",
+            }
+        ]
+
+        mock_response = unittest.mock.Mock()
+        mock_response.choices = [
+            unittest.mock.Mock(
+                finish_reason="stop",
+                message=unittest.mock.Mock(
+                    content="# Research Report\n\nTest report."
+                ),
+            )
+        ]
+
+        mock_llm.chat.completions.create.return_value = mock_response
+
+        report = report_generator.generate_report(
+            self.research_question,
+            self.research_results,
+        )
+
+        # Report generation should continue despite assessment failure.
+        self.assertIn("Test report", report)
+
+        # Source assessment should have been attempted.
+        mock_source_quality.assert_called_once_with(
+            ["https://example.com/research"]
+        )
+
+        # The finding should still reach relevance assessment.
+        relevance_findings = mock_relevance.call_args.kwargs["findings"]
+        self.assertEqual(len(relevance_findings), 1)
+
+        # The report prompt should disclose the failed assessment.
+        report_prompt = (
+            mock_llm.chat.completions.create.call_args.kwargs["messages"][1]["content"]
+        )
+
+    
+    @patch("report_generator.llm")
+    @patch("report_generator.assess_relevance")
+    @patch("report_generator.assess_source_quality")
+    def test_generate_report_retains_findings_with_incomplete_relevance_assessments(
+        self,
+        mock_source_quality,
+        mock_relevance,
+        mock_llm,
+    ):
+        # Create three structurally valid findings.
+        findings = [
+            self.valid_finding.copy(),
+            {
+                **self.valid_finding,
+                "claim": "Technology adoption can reduce operational costs.",
+                "source_url": "https://example.com/costs",
+            },
+            {
+                **self.valid_finding,
+                "claim": "Technology can improve decision-making.",
+                "source_url": "https://example.com/decisions",
+            },
+        ]
+
+        research_results = [
+            {
+                "sub_question": "Technology and productivity",
+                "findings": findings,
+            }
+        ]
+
+        mock_source_quality.return_value = {
+            finding["source_url"]: {
+                "source_type": "reputable_media",
+                "reason": "Test classification.",
+                "assessment_basis": "Mocked test.",
+                "assessment_status": "completed",
+            }
+            for finding in findings
+        }
+
+        # Deliberately return only one assessment for three findings.
+        mock_relevance.return_value = [
+            {
+                "relevance": "direct",
+                "reason": "Directly addresses the research question.",
+            }
+        ]
+
+        mock_response = unittest.mock.Mock()
+        mock_response.choices = [
+            unittest.mock.Mock(
+                finish_reason="stop",
+                message=unittest.mock.Mock(
+                    content="# Research Report\n\nTest report."
+                ),
+            )
+        ]
+
+        mock_llm.chat.completions.create.return_value = mock_response
+
+        report = report_generator.generate_report(
+            self.research_question,
+            research_results,
+        )
+
+        # Report generation should complete.
+        self.assertIn("Test report", report)
+
+        # All three findings should have reached relevance assessment.
+        assessed_findings = mock_relevance.call_args.kwargs["findings"]
+        self.assertEqual(len(assessed_findings), 3)
+
+        # All three findings should reach the final report prompt.
+        report_prompt = (
+            mock_llm.chat.completions.create.call_args.kwargs["messages"][1]["content"]
+        )
+
+        self.assertIn(findings[0]["claim"], report_prompt)
+        self.assertIn(findings[1]["claim"], report_prompt)
+        self.assertIn(findings[2]["claim"], report_prompt)
+
+
 
 
 if __name__ == "__main__":

@@ -93,6 +93,48 @@ class TestValidateFindings(unittest.TestCase):
         self.assertEqual(len(valid), 0)
         self.assertEqual(len(rejected), 1)
 
+    def test_list_evidence_type_is_rejected(self):
+        finding = self.valid_finding.copy()
+        finding["evidence_type"] = ["observed_finding"]
+
+        valid, rejected = validate_findings([finding])
+
+        self.assertEqual(len(valid), 0)
+        self.assertEqual(len(rejected), 1)
+
+
+    def test_dictionary_evidence_type_is_rejected(self):
+        finding = self.valid_finding.copy()
+        finding["evidence_type"] = {"type": "observed_finding"}
+
+        valid, rejected = validate_findings([finding])
+
+        self.assertEqual(len(valid), 0)
+        self.assertEqual(len(rejected), 1)
+
+
+    def test_list_alignment_status_is_rejected(self):
+        finding = self.valid_finding.copy()
+        finding["alignment_status"] = ["supported"]
+
+        valid, rejected = validate_findings([finding])
+
+        self.assertEqual(len(valid), 0)
+        self.assertEqual(len(rejected), 1)
+
+
+    def test_non_list_input_is_rejected(self):
+        valid, rejected = validate_findings({
+            "claim": "Some research claim"
+        })
+
+        self.assertEqual(len(valid), 0)
+        self.assertEqual(len(rejected), 1)
+        self.assertIn(
+            "Input findings must be a list.",
+            rejected[0]["reasons"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

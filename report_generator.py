@@ -24,6 +24,12 @@ def validate_findings(findings: list) -> tuple[list, list]:
         rejected_findings: Findings rejected with their validation reasons.
     """
 
+    if not isinstance(findings, list):
+        return [], [{
+            "finding_index": None,
+            "reasons": ["Input findings must be a list."],
+        }]
+
     valid_findings = []
     rejected_findings = []
 
@@ -75,13 +81,19 @@ def validate_findings(findings: list) -> tuple[list, list]:
         # Validate evidence classification.
         evidence_type = finding.get("evidence_type")
 
-        if evidence_type not in valid_evidence_types:
+        if (
+            not isinstance(evidence_type, str)
+            or evidence_type not in valid_evidence_types
+        ):
             errors.append("Invalid or missing evidence_type.")
 
         # Validate claim-to-evidence alignment.
         alignment_status = finding.get("alignment_status", "not_assessed")
 
-        if alignment_status not in valid_alignment_statuses:
+        if (
+            not isinstance(alignment_status, str)
+            or alignment_status not in valid_alignment_statuses
+       ):
             errors.append("Invalid alignment_status.")
 
         if errors:
@@ -194,20 +206,29 @@ def assess_relevance(research_question: str, findings: list) -> list:
 
     assessment_map = {}
 
+    
     for item in assessments:
+
+        # Ignore malformed assessment entries.
+        if not isinstance(item, dict):
+            continue
+
         finding_id = item.get("finding_id")
         relevance = item.get("relevance")
         reason = item.get("reason", "")
 
         if (
             isinstance(finding_id, int)
+            and not isinstance(finding_id, bool)
             and 1 <= finding_id <= len(findings)
+            and isinstance(relevance, str)
             and relevance in valid_categories
         ):
             assessment_map[finding_id] = {
                 "relevance": relevance,
-                "reason": reason,
+                "reason": reason if isinstance(reason, str) else "",
             }
+
 
     results = []
 
@@ -216,11 +237,11 @@ def assess_relevance(research_question: str, findings: list) -> list:
             assessment_map.get(
                 index,
                 {
-                    "relevance": "contextual",
+                    "relevance": "not_assessed",
                     "reason": (
                         "The relevance assessment did not return "
                         "a valid classification."
-                    ),
+                 ),
                 },
             )
         )
@@ -302,21 +323,108 @@ def generate_report(
         dict.fromkeys(finding["source_url"] for finding in findings)
     )
 
-    source_assessments = assess_source_quality(source_urls)
+    try:
+        source_assessments = assess_source_quality(source_urls)
+
+    except Exception as exc:
+        print(f"Source-quality assessment failed: {exc}")
+        print("Retaining findings with source quality marked as unknown.")
+
+        source_assessments = {
+            url: {
+                "source_type": "unknown",
+                "reason": (
+                    "Source-quality assessment could not be completed "
+                    "because the assessment process failed."
+                ),
+                "assessment_basis": "Assessment unavailable",
+                "assessment_status": "failed",
+            }
+            for url in source_urls
+        }
 
     for finding in findings:
-        finding["source_quality"] = source_assessments[
-            finding["source_url"]
-        ]
+        finding["source_quality"] = source_assessments.get(
+            finding["source_url"],
+            {
+                "source_type": "unknown",
+                "reason": "No valid source assessment was returned.",
+                "assessment_basis": "Assessment unavailable",
+                "assessment_status": "not_assessed",
+            },
+        )
 
     # Step 1: Assess relevance before generating the report.
-    relevance_assessments = assess_relevance(
-        research_question=research_question,
-        findings=findings,
-    )
+    try:
+        relevance_assessments = assess_relevance(
+            research_question=research_question,
+            findings=findings,
+        )
+
+    except Exception as exc:
+        print(f"Relevance assessment failed: {exc}")
+        print("Retaining findings with relevance marked as not_assessed.")
+
+        relevance_assessments = [
+            {
+                "relevance": "not_assessed",
+                "reason": (
+                    "Relevance assessment could not be completed "
+                    "because the assessment process failed."
+                ),
+            }
+            for _ in findings
+        ]
 
     relevant_findings = []
+    
+    # Ensure every finding has a valid relevance assessment.
+    valid_relevance_categories = {
+        "direct",
+        "indirect",
+        "contextual",
+        "irrelevant",
+        "not_assessed",
+    }
+
+    if not isinstance(relevance_assessments, list):
+        relevance_assessments = []
+
+    normalized_assessments = []
+
+    for index in range(len(findings)):
+        assessment = (
+            relevance_assessments[index]
+            if index < len(relevance_assessments)
+            else None
+        )
+
+        if (
+            isinstance(assessment, dict)
+            and isinstance(assessment.get("relevance"), str)
+            and assessment["relevance"] in valid_relevance_categories
+        ):
+            normalized_assessments.append({
+                "relevance": assessment["relevance"],
+                "reason": (
+                    assessment.get("reason", "")
+                    if isinstance(assessment.get("reason", ""), str)
+                    else ""
+                ),
+            })
+        else:
+            normalized_assessments.append({
+                "relevance": "not_assessed",
+                "reason": (
+                    "No valid relevance assessment was returned "
+                    "for this finding."
+                ),
+            })
+
+    relevance_assessments = normalized_assessments
+
     excluded_count = 0
+    not_assessed_relevance_count = 0
 
     for finding, assessment in zip(findings, relevance_assessments):
         finding["relevance"] = assessment["relevance"]
@@ -326,7 +434,12 @@ def generate_report(
             excluded_count += 1
             continue
 
+        if finding["relevance"] == "not_assessed":
+            not_assessed_relevance_count += 1
+
         relevant_findings.append(finding)
+
+    
 
     if not relevant_findings:
         return (
@@ -520,8 +633,9 @@ def generate_report(
                     "measured impact wherever relevant.\n\n"
 
                     "In Limitations, identify evidence gaps, partial alignment, "
-                    "unassessed findings, geographical limitations, weak source "
-                    "provenance and missing measured outcomes where applicable.\n\n"
+                    "unassessed findings, unsuccessful relevance assessments, "
+                    "geographical limitations, weak source provenance and missing "
+                    "measured outcomes where applicable.\n\n"
 
                     "In the Conclusion, answer the research question only to the "
                     "extent that the available evidence permits. State clearly "
@@ -571,6 +685,8 @@ def generate_report(
                     f"{len(rejected_findings)}\n"
                     f"Number of findings excluded as irrelevant: "
                     f"{excluded_count}\n"
+                    f"Number of findings without relevance assessment: "
+                    f"{not_assessed_relevance_count}\n"
                     f"Number of unsupported claims excluded: {unsupported_count}\n"
                     f"Number of findings without alignment assessment: "
                     f"{not_assessed_count}"
@@ -701,16 +817,18 @@ def assess_source_quality(source_urls: list) -> dict:
                 "source_type": source_type,
                 "reason": item.get("reason", ""),
                 "assessment_basis": "URL and recognizable domain only",
-            }
+                "assessment_status": "completed",
+         }
 
     # Missing or invalid assessments remain unknown.
     return {
         url: assessment_map.get(
             url,
-            {
+           {
                 "source_type": "unknown",
                 "reason": "No valid source classification was returned.",
                 "assessment_basis": "Insufficient information",
+                "assessment_status": "not_assessed",
             },
         )
         for url in source_urls
