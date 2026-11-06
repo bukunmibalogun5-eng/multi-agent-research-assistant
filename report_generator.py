@@ -471,6 +471,7 @@ def generate_report(
             f"Source type: {source_quality['source_type']}\n"
             f"Source classification reason: {source_quality['reason']}\n"
             f"Assessment basis: {source_quality['assessment_basis']}\n"
+            f"Source assessment status: {source_quality['assessment_status']}\n"
             f"Claim: {finding['claim']}\n"
             f"Supporting excerpt: {finding['snippet']}\n"
             f"Citation: [{citation}] {url}\n"
@@ -601,12 +602,21 @@ def generate_report(
 
                     "6. SOURCE QUALITY AND PROVENANCE\n\n"
 
-                    "Each finding includes an apparent source publication-type "
-                    "classification. Use this to describe provenance cautiously.\n\n"
+                    "Each finding includes a source publication-type classification "
+                    "and an assessment status. Use both to describe source provenance cautiously.\n\n"
+
+                    "Assessment statuses have these meanings:\n"
+                    "- completed: The source classification process returned a valid "
+                    "classification. This includes sources classified as unknown.\n"
+                    "- not_assessed: No valid classification was returned for the source.\n"
+                    "- failed: The source classification process encountered an error.\n\n"
 
                     "These classifications were assessed using URLs and recognizable "
                     "domains only. They do not establish factual accuracy, authenticity "
                     "or peer-review status independently.\n\n"
+
+                    "Never present a source whose assessment status is not_assessed or "
+                    "failed as though its publication type was successfully verified.\n\n"
 
                     "Do not treat publication type as proof of reliability. "
                     "Peer-reviewed research can have limitations, and organizational "
@@ -712,6 +722,7 @@ def generate_report(
     return report.strip()
 
 
+
 def assess_source_quality(source_urls: list) -> dict:
     """Classify source publication types using available URL information."""
 
@@ -791,6 +802,10 @@ def assess_source_quality(source_urls: list) -> dict:
         raise ValueError("Source classification returned an empty response.")
 
     data = json.loads(content)
+
+    if not isinstance(data, dict):
+        raise ValueError("Invalid source classification response.")
+
     source_assessments = data.get("sources")
 
     if not isinstance(source_assessments, list):
@@ -809,22 +824,36 @@ def assess_source_quality(source_urls: list) -> dict:
     assessment_map = {}
 
     for item in source_assessments:
+
+        # Ignore malformed entries.
+        if not isinstance(item, dict):
+            continue
+
         url = item.get("url")
         source_type = item.get("source_type")
+        reason = item.get("reason", "")
 
-        if url in source_urls and source_type in valid_categories:
+        if (
+            isinstance(url, str)
+            and url in source_urls
+            and isinstance(source_type, str)
+            and source_type in valid_categories
+        ):
             assessment_map[url] = {
                 "source_type": source_type,
-                "reason": item.get("reason", ""),
+                "reason": (
+                    reason if isinstance(reason, str)
+                    else "No valid classification reason was provided."
+                ),
                 "assessment_basis": "URL and recognizable domain only",
                 "assessment_status": "completed",
-         }
+            }
 
     # Missing or invalid assessments remain unknown.
     return {
         url: assessment_map.get(
             url,
-           {
+            {
                 "source_type": "unknown",
                 "reason": "No valid source classification was returned.",
                 "assessment_basis": "Insufficient information",

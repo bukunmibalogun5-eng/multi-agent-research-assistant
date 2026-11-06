@@ -62,6 +62,7 @@ class TestReportIntegration(unittest.TestCase):
                 "source_type": "reputable_media",
                 "reason": "Test classification.",
                 "assessment_basis": "Mocked test.",
+                "assessment_status": "completed",
             }
         }
 
@@ -105,8 +106,13 @@ class TestReportIntegration(unittest.TestCase):
             mock_llm.chat.completions.create.call_args.kwargs["messages"][1]["content"]
         )
 
+
         self.assertIn(
             "Number of findings rejected during structural validation: 2",
+            report_prompt,
+        )
+        self.assertIn(
+            "Source assessment status: completed",
             report_prompt,
         )
     @patch("report_generator.llm")
@@ -162,7 +168,10 @@ class TestReportIntegration(unittest.TestCase):
         report_prompt = (
             mock_llm.chat.completions.create.call_args.kwargs["messages"][1]["content"]
         )
-
+        self.assertIn(
+            "Source assessment status: failed",
+            report_prompt,
+        )
     
     @patch("report_generator.llm")
     @patch("report_generator.assess_relevance")
