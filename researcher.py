@@ -502,8 +502,37 @@ def research_sub_question(
                                     "measured outcome. "
 
                                     "Return no more than 4 findings from this batch. "
-                                    "Choose the most relevant findings and keep each claim concise. "
-                                    "Use an empty array if no useful findings are supported. "
+
+                                   "Prioritize specific, substantive findings that directly help "
+                                   "answer the research question over broad or generic statements. "
+
+                                   "Where the research question contains multiple dimensions, "
+                                   "extract findings that address different relevant dimensions "
+                                   "rather than repeatedly covering only one aspect. "
+
+                                   "Look for concrete results, documented impacts, measured changes, "
+                                    "comparisons, statistics, explanations, and conclusions where "
+                                    "the source provides them. "
+
+                                    "When the question asks about impacts or consequences, extract "
+                                    "the actual documented effects reported by the source. Do not "
+                                    "substitute general descriptions of the topic for evidence of "
+                                    "those effects. "
+
+                                    "Do not treat a report title, abstract description, introduction, "
+                                    "or statement of research objectives as a substantive research "
+                                    "finding. Extract the actual results or conclusions where available. "
+
+                                    "Avoid extracting multiple findings that communicate essentially "
+                                    "the same information. Prefer distinct findings that add new "
+                                    "information. "
+
+                                    "Do not invent missing dimensions or force a source to answer "
+                                    "something it does not address. "
+
+                                    "Choose the strongest and most relevant findings available in "
+                                    "the supplied material. Use an empty array if no useful findings "
+                                    "are supported. "
 
                                     "The claim must accurately reflect what the source says. "
                                     "Do not exaggerate, infer unsupported outcomes, or turn "
