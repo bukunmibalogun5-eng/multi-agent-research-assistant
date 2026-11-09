@@ -340,6 +340,56 @@ def generate_search_queries(sub_question: str) -> list[str]:
     return validated_queries
 
 
+def deduplicate_findings(findings):
+    unique_findings = []
+    seen_claims = set()
+    seen_claim_tokens = []
+
+    stop_words = {
+        "a", "an", "and", "are", "as", "at", "by",
+        "for", "from", "in", "is", "of", "on", "or",
+        "the", "to", "with", "due"
+    }
+
+    for finding in findings:
+        normalized_claim = " ".join(
+            finding.claim.casefold().split()
+        )
+
+        if normalized_claim in seen_claims:
+            continue
+
+        claim_tokens = {
+            word.strip(".,!?;:")
+            for word in normalized_claim.split()
+            if word.strip(".,!?;:") not in stop_words
+        }
+
+        is_near_duplicate = False
+
+        for previous_tokens in seen_claim_tokens:
+            shared_words = claim_tokens & previous_tokens
+
+            if (
+                len(shared_words) >= 4
+                and len(shared_words) / min(
+                    len(claim_tokens),
+                    len(previous_tokens)
+                ) >= 0.8
+            ):
+                is_near_duplicate = True
+                break
+
+        if not is_near_duplicate:
+            seen_claims.add(normalized_claim)
+            seen_claim_tokens.append(claim_tokens)
+            unique_findings.append(finding)
+
+    duplicates_removed = len(findings) - len(unique_findings)
+
+    return unique_findings, duplicates_removed
+
+
 def research_sub_question(
     sub_question: str,
 ) -> ResearchResult:
@@ -725,6 +775,7 @@ def research_sub_question(
             "snippet_mismatch": 0,
             "invalid_schema": 0,
             "unsupported_alignment": 0,
+            "not_assessed_alignment": 0,
         }
 
         print("\nFinding validation:")
@@ -805,6 +856,14 @@ def research_sub_question(
                 item["alignment_status"] = alignment["alignment_status"]
                 item["alignment_reason"] = alignment["alignment_reason"]
 
+                if item["alignment_status"] == "not_assessed":
+                    rejection_reasons["not_assessed_alignment"] += 1
+                    print(
+                        f"REJECTED: Unverified finding: {item['claim']}\n"
+                        f"Reason: {item['alignment_reason']}"
+             )
+                    continue    
+
                 if item["alignment_status"] == "unsupported":
                     rejection_reasons["unsupported_alignment"] += 1
                     print(
@@ -843,26 +902,12 @@ def research_sub_question(
                 print(f"  {reason}: {count}")
 
         # STEP 6: Remove duplicate findings
-        unique_findings = []
-        seen_claims = set()
-
-        for finding in findings:
-            normalized_claim = " ".join(
-                finding.claim.casefold().split()
-            )
-
-            if normalized_claim not in seen_claims:
-                seen_claims.add(normalized_claim)
-                unique_findings.append(finding)
-
-        duplicates_removed = len(findings) - len(unique_findings)
+        findings, duplicates_removed = deduplicate_findings(findings)
 
         print("\nDeduplication summary:")
-        print(f"Findings before deduplication: {len(findings)}")
+        print(f"Findings before deduplication: {duplicates_removed + len(findings)}")
         print(f"Duplicates removed: {duplicates_removed}")
-        print(f"Unique findings retained: {len(unique_findings)}")
-
-        findings = unique_findings
+        print(f"Unique findings retained: {len(findings)}")
 
         # STEP 7: Return the research result
         return ResearchResult(

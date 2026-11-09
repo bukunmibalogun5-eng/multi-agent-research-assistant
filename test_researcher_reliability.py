@@ -3,7 +3,12 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
-from researcher import ResearchResult, research_sub_question
+from researcher import (
+    Finding,
+    ResearchResult,
+    deduplicate_findings,
+    research_sub_question,
+)
 
 
 class TestResearchResultReliability(unittest.TestCase):
@@ -203,6 +208,115 @@ class TestResearchResultReliability(unittest.TestCase):
         self.assertEqual(result.batches_succeeded, 0)
         self.assertEqual(result.failed_batches, [1])
         self.assertEqual(len(result.findings), 0)
+
+    def test_not_assessed_finding_is_rejected(self):
+
+        sources = self.create_sources(5)
+
+        finding = self.create_valid_finding(sources[0])
+
+        response = self.create_extraction_response([finding])
+
+        with (
+            patch(
+                "researcher.generate_search_queries",
+                return_value=["test search query"],
+            ),
+            patch(
+                "researcher.search_client.search",
+                return_value={"results": sources},
+            ),
+            patch("researcher.llm") as mock_llm,
+            patch(
+                "researcher.assess_alignment_with_fallback",
+                return_value=[
+                    {
+                        "alignment_status": "not_assessed",
+                        "alignment_reason": "Assessment service unavailable.",
+                    }
+                ],
+            ),
+            patch("researcher.time.sleep"),
+        ):
+
+            mock_llm.chat.completions.create.return_value = response
+
+            result = research_sub_question(self.question)
+
+        self.assertEqual(len(result.findings), 0)
+        self.assertEqual(result.status, "insufficient_evidence")
+
+    def test_exact_duplicate_findings_are_removed(self):
+        finding1 = Finding(
+            claim="Climate change increases global temperatures.",
+            source_url="https://example.com/1",
+            snippet="Evidence snippet one is sufficiently long.",
+            retrieved_at="",
+            evidence_type="measured_outcome",
+        )
+
+        finding2 = Finding(
+            claim="Climate change increases global temperatures.",
+            source_url="https://example.com/2",
+            snippet="Evidence snippet two is sufficiently long.",
+            retrieved_at="",
+            evidence_type="measured_outcome",
+        )
+
+        unique, duplicates = deduplicate_findings(
+            [finding1, finding2]
+        )
+
+        self.assertEqual(len(unique), 1)
+        self.assertEqual(duplicates, 1)
+
+    def test_near_duplicate_findings_are_removed(self):
+        finding1 = Finding(
+            claim="Climate change increases global temperatures significantly.",
+            source_url="https://example.com/1",
+            snippet="Evidence snippet one is sufficiently long.",
+            retrieved_at="",
+            evidence_type="measured_outcome",
+        )
+
+        finding2 = Finding(
+            claim="Climate change increases global temperatures rapidly.",
+            source_url="https://example.com/2",
+            snippet="Evidence snippet two is sufficiently long.",
+            retrieved_at="",
+            evidence_type="measured_outcome",
+        )
+
+        unique, duplicates = deduplicate_findings(
+            [finding1, finding2]
+        )
+
+        self.assertEqual(len(unique), 1)
+        self.assertEqual(duplicates, 1)
+
+    def test_distinct_findings_are_retained(self):
+        finding1 = Finding(
+            claim="Climate change increases global temperatures.",
+            source_url="https://example.com/1",
+            snippet="Evidence snippet one is sufficiently long.",
+            retrieved_at="",
+            evidence_type="measured_outcome",
+        )
+
+        finding2 = Finding(
+            claim="Deforestation reduces biodiversity in tropical forests.",
+            source_url="https://example.com/2",
+            snippet="Evidence snippet two is sufficiently long.",
+            retrieved_at="",
+            evidence_type="observed_finding",
+        )
+
+        unique, duplicates = deduplicate_findings(
+            [finding1, finding2]
+        )
+
+        self.assertEqual(len(unique), 2)
+        self.assertEqual(duplicates, 0)
 
 
 if __name__ == "__main__":
