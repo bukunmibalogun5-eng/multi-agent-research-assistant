@@ -76,6 +76,9 @@ class ResearchResult(BaseModel):
     status: str
     findings: list[Finding] = Field(default_factory=list)
     message: str | None = None
+    batches_total: int = 0
+    batches_succeeded: int = 0
+    failed_batches: list[int] = Field(default_factory=list)
 
 def assess_claim_alignment(candidates: list[dict]) -> list[dict]:
     """
@@ -440,6 +443,10 @@ def research_sub_question(
 
     print(f"\nProcessing {len(source_batches)} source batches...")
 
+    batches_total = len(source_batches)
+    batches_succeeded = 0
+    failed_batches = []
+
     for batch_number, source_batch in enumerate(source_batches, start=1):
 
         print(
@@ -637,12 +644,14 @@ def research_sub_question(
 
             batch_findings = data.get("findings", [])
 
+
             if not isinstance(batch_findings, list):
                 raise ValueError(
                     f"Invalid findings structure in batch {batch_number}."
-                )
+          )
 
             raw_findings.extend(batch_findings)
+            batches_succeeded += 1
 
             print(
                 f"Findings extracted from batch {batch_number}: "
@@ -650,20 +659,46 @@ def research_sub_question(
             )
 
         except Exception as exc:
+            failed_batches.append(batch_number)
             print(f"Batch {batch_number} failed: {exc}")
             continue
 
     print("\nExtraction summary:")
     print(f"Sources processed: {len(usable_results)}")
-    print(f"Batches processed: {len(source_batches)}")
+    print(f"Total batches: {batches_total}")
+    print(f"Successful batches: {batches_succeeded}")
+    print(f"Failed batches: {len(failed_batches)}")
+    print(f"Failed batch numbers: {failed_batches}")
     print(f"Total findings extracted: {len(raw_findings)}")
 
     if not raw_findings:
+        if batches_succeeded == 0:
+            return ResearchResult(
+                sub_question=sub_question,
+                status="research_failed",
+                findings=[],
+                message="All extraction batches failed.",
+                batches_total=batches_total,
+                batches_succeeded=batches_succeeded,
+                failed_batches=failed_batches,
+            )
+
         return ResearchResult(
             sub_question=sub_question,
-            status="insufficient_evidence",
+            status=(
+                "partial_success"
+                if failed_batches
+                else "insufficient_evidence"
+            ),
             findings=[],
-            message="No findings could be extracted from the retrieved sources.",
+            message=(
+                "Some extraction batches failed; no findings were extracted."
+                if failed_batches
+                else "No useful findings could be extracted from the retrieved sources."
+            ),
+            batches_total=batches_total,
+            batches_succeeded=batches_succeeded,
+            failed_batches=failed_batches,
         )
 
     # STEP 4: Prepare combined findings for validation
@@ -832,10 +867,22 @@ def research_sub_question(
         # STEP 7: Return the research result
         return ResearchResult(
             sub_question=sub_question,
-            status="success" if findings else "insufficient_evidence",
+            status=(
+                "partial_success"
+                if failed_batches
+                else "success" if findings
+                else "insufficient_evidence"
+            ),
             findings=findings,
-            message=None if findings else "No supported findings were extracted.",
-        )
+            message=(
+                f"{len(failed_batches)} of {batches_total} extraction batches failed."
+                if failed_batches
+                else None
+            ),
+            batches_total=batches_total,
+            batches_succeeded=batches_succeeded,
+            failed_batches=failed_batches,
+     )
 
     except Exception as exc:
         print(f"Research processing failed: {exc}")
