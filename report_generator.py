@@ -252,6 +252,8 @@ def assess_relevance(research_question: str, findings: list) -> list:
 def generate_report(
     research_question: str,
     research_results: list,
+    coverage_assessment: list | None = None,
+    coverage_percentage: float = 0.0,
 ) -> str:
     """Generate a cited Markdown report from validated findings."""
 
@@ -691,6 +693,14 @@ def generate_report(
                     f"Research question: {research_question}\n\n"
                     f"Relevant validated findings:\n{evidence_text}\n\n"
                     f"References:\n{references}\n\n"
+                    f"Research coverage assessment:\n"
+                    f"{chr(10).join(
+                        f'- {item["sub_question"]}: {item["coverage_status"]} '
+                        f'({item["findings_count"]} findings)'
+                        for item in (coverage_assessment or [])
+                    )}\n\n"
+                    f"Percentage of sub-questions fully covered: "
+                    f"{coverage_percentage}%\n\n"
                     f"Number of findings rejected during structural validation: "
                     f"{len(rejected_findings)}\n"
                     f"Number of findings excluded as irrelevant: "
