@@ -523,6 +523,20 @@ def generate_report(
                     "observed outcome. A measured result in a technical experiment "
                     "does not automatically demonstrate real-world effectiveness.\n\n"
 
+                    "IMMUTABLE EVIDENCE CLASSIFICATIONS:\n"
+                    "Each supplied finding has an explicitly assigned evidence "
+                    "classification. This classification is authoritative and must "
+                    "remain unchanged throughout the report.\n"
+                    "- Copy the exact evidence classification supplied for each finding.\n"
+                    "- Do not independently reclassify a finding based on its wording.\n"
+                    "- Do not change a prediction into an observed_finding or "
+                    "measured_outcome.\n"
+                    "- Do not change a proposal into an implemented outcome.\n"
+                    "- When summarizing multiple findings, preserve the classification "
+                    "of each individual finding.\n"
+                    "- If a finding is partially supported, qualify its claim without "
+                    "changing its evidence classification.\n\n"
+
                     "2. CLAIM-TO-EVIDENCE ALIGNMENT\n\n"
 
                     "Each finding also has an alignment classification:\n"
