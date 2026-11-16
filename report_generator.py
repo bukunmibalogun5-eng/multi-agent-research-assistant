@@ -679,8 +679,9 @@ def generate_report(
                     "Where a statement synthesizes multiple findings, cite all "
                     "relevant supporting sources.\n\n"
 
-                    "Finish with a numbered References section containing the "
-                    "supplied source URLs. Do not invent references or modify URLs.\n\n"
+                    "Do not generate a References section. "
+                    "The application will append the verified references separately. "
+                    "Use only the supplied citation numbers in the report body.\n\n"
 
                     "9. FINAL ACCURACY CHECK\n\n"
 
@@ -727,7 +728,7 @@ def generate_report(
                 ),
             },
         ],
-        max_completion_tokens=3000,
+        max_completion_tokens=6000,
     )
 
     choice = response.choices[0]
@@ -743,7 +744,11 @@ def generate_report(
     if not report or not report.strip():
         raise ValueError("The report generator returned an empty response.")
 
-    return report.strip()
+    return (
+        f"{report.strip()}\n\n"
+        f"## References\n\n"
+        f"{references}"
+    )
 
 
 
